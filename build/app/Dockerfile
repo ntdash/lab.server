@@ -1,24 +1,6 @@
-FROM node:20-alpine AS built_assets
-
-ARG WORKPATH="/srv/app"
-
-# copy project contents
-ADD ./core "${WORKPATH}"
-
-WORKDIR "${WORKPATH}"
-
-# install packages
-RUN npm install \
-    # build
-    && npm run build \
-    # remove node modules
-    && rm -rf ./node_modules
-
-
 FROM php:8.2-fpm-bookworm
 
-ARG BUILD_BASEPATH="./server/build/app"
-ARG WORKPATH="/srv/app"
+ARG WORKPATH="/srv/lab/core"
 
 RUN apt update -y && apt install -y \
     # quick dev debug packages
@@ -61,49 +43,41 @@ RUN apt install -y libzip-dev \
 RUN docker-php-ext-configure pcntl --enable-pcntl \
     && docker-php-ext-install pcntl
 
+# install composer
+RUN curl -o- https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+
 # php config
 WORKDIR "${PHP_INI_DIR}"
 
-ADD "${BUILD_BASEPATH}/etc/php/conf.ini" "./php.ini"
+ADD ./conf.d/php.ini ./
 
 # php-fpm config
 WORKDIR "/usr/local/etc/php-fpm.d"
 
 RUN rm -rf ./*
-ADD "${BUILD_BASEPATH}/etc/php-fpm/www.conf" "./www.conf"
-ADD "${BUILD_BASEPATH}/etc/php-fpm/zz-docker.conf" "./zz-docker.conf"
-
+ADD ./conf.d/fpm/www.conf ./conf.d/fpm/zz-docker.conf ./
 
 # create missing folders
 ARG MEDIA_STORE="/data"
 
 # set data folder for objects and thumb
-RUN mkdir -pm 0770 "${MEDIA_STORE}" "${WORKPATH}" \
+RUN mkdir -pm 0770 "${MEDIA_STORE}" \
     # update ownership
-    && chown www-data:www-data "${MEDIA_STORE}" "${WORKPATH}"
-
-# copy project from source to dest
-ADD  ./core "${WORKPATH}"
+    && chown -R www-data:www-data "/srv" "${MEDIA_STORE}" 
 
 # switch to workdir
 WORKDIR "${WORKPATH}"
 
-# remove assets from public folder
-RUN find ./public -maxdepth 1 ! -path ./public ! -ipath '*.php' | xargs -I % -- rm -rf %
-
-# install server side packages via composer
-RUN curl -o- https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer \
-    # install server dependencies packages
-    && composer install
-
-
+# ----------------------------------------
 ARG APP_KEY="--"
 ARG DB_DATABASE="lab_core_db"
 ARG DB_USERNAME="root"
 ARG DB_PASSWORD="passwd"
 
+ENV APP_ENV="production"
 ENV APP_KEY="${APP_KEY}"
 ENV DB_DATABASE="${DB_DATABASE}"
 ENV DB_USERNAME="${DB_USERNAME}"
 ENV DB_PASSWORD="${DB_PASSWORD}"
+
 

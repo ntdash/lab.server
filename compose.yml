@@ -1,0 +1,45 @@
+name: lab_core
+
+networks:
+  lab_net:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.20.1.0/24
+          gateway: 172.20.1.254
+
+volumes:
+  redis-data: {}
+  postgres-data: {}
+  resources-store: {}
+
+services:
+  app:
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      lab_net:
+        ipv4_address: 172.20.1.10
+    volumes:
+      - resources-store:/data
+      - ${WORKDIR}:${WORKDIR}
+      - ${SOCKETS_PATH}:/run/lab.sockets
+    image: lab_core_app:20240314-prod-1
+
+  postgres:
+    networks:
+      lab_net:
+        ipv4_address: 172.20.1.20
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    image: lab_core_db:20240314-prod-1
+
+  redis:
+    networks:
+      lab_net:
+        ipv4_address: 172.20.1.30
+    volumes:
+      - redis-data:/data
+    image: lab_core_cache:20240314-prod-1

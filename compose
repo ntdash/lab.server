@@ -42,10 +42,6 @@ case "${cmd}" in
 
         docker compose --env-file ${ENV_FILE} -f ${COMPOSE_FILE} build $args
     ;;
-    "nop")
-        echo "compose: missing command";
-        exit 1;
-    ;;
     *)
         COMPOSE_FILE="${basepath}/compose${prefix}.yml"
         ENV_FILE="${basepath}/.env${prefix}"
