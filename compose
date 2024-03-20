@@ -1,0 +1,55 @@
+#! /usr/bin/env bash
+basepath="$(dirname $(realpath ${0}))"
+
+type docker 2>&1 > /dev/null
+
+if [[ 0 -ne $? ]]
+then
+    echo "${SHELL}: command not found: docker";
+    exit 1;
+fi
+
+prefix=".staging"
+        
+# check if building for production
+echo "${1:-nop}" | grep -wi '--prod' &> /dev/null
+
+if [[ 0 -eq $? ]] 
+then
+    shift 1
+    prefix=""
+fi
+
+cmd="$(echo ${1:-nop} | awk '{print tolower($0)}')"
+
+case "${cmd}" in
+    "build")
+        declare -x APP_KEY="base64:$(openssl rand -base64 32)"
+        declare -x DB_PASSWORD="$(openssl rand -base64 32 | sed -r 's/[\/+=]/_/g')"
+
+        # remove db volume to prevent password persistency that get change after every build
+        docker volume rm lab_core_postgres-data &> /dev/null
+
+        COMPOSE_FILE="${basepath}/build/compose${prefix}.yml"
+        ENV_FILE="${basepath}/build/.env${prefix}"
+
+        args=""
+
+        if [[ $# -ge 2 ]] 
+        then
+            args="${@:2}"
+        fi
+
+        docker compose --env-file ${ENV_FILE} -f ${COMPOSE_FILE} build $args
+    ;;
+    "nop")
+        echo "compose: missing command";
+        exit 1;
+    ;;
+    *)
+        COMPOSE_FILE="${basepath}/compose${prefix}.yml"
+        ENV_FILE="${basepath}/.env${prefix}"
+
+        docker compose --env-file ${ENV_FILE} -f ${COMPOSE_FILE} ${@:1}
+    ;;
+esac;

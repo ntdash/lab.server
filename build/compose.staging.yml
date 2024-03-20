@@ -1,0 +1,29 @@
+name: "lab_core"
+
+services:
+  app:
+    build:
+      args:
+        APP_KEY: "${APP_KEY}"
+        DB_DATABASE: lab_core_db
+        DB_USERNAME: root
+        DB_PASSWORD: "${DB_PASSWORD}"
+      context: ./app
+      dockerfile: Dockerfile.staging
+    image: lab_core_app:20240314-1
+
+  db:
+    build:
+      args:
+        DB_DATABASE: lab_core_db
+        DB_USERNAME: root
+        DB_PASSWORD: "${DB_PASSWORD}"
+      context: ./db
+      dockerfile: Dockerfile.staging
+    image: lab_core_db:20240314-1
+
+  cache:
+    build:
+      context: ./cache
+      dockerfile: Dockerfile.staging
+    image: lab_core_cache:20240314-1

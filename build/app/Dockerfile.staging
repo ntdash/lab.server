@@ -1,0 +1,81 @@
+FROM php:8.2-fpm-bookworm
+
+ARG WORKPATH="/srv/lab/core"
+
+RUN apt update -y && apt install -y \
+    # quick dev debug packages
+    tree vim \
+    # build packages
+    git curl wget gnupg zip unzip build-essential make cmake
+
+# install bento toolset for mp4 media inspection and transformation
+ARG BENTO_SOURCE="https://github.com/axiomatic-systems/Bento4.git"
+WORKDIR "/tmp/bento"
+
+RUN git clone --depth=1 $BENTO_SOURCE . \
+    && mkdir ./cmakebuild && cd ./cmakebuild \
+    && cmake -DCMAKE_BUILD_TYPE=Release .. \
+    && make \
+    && mv mp4* /usr/local/bin
+
+# install ffmpeg and ffmpegthumbnailer
+RUN apt install -y ffmpeg ffmpegthumbnailer
+
+# install and enable postgres extension
+RUN apt update -y \
+    && apt install -y libpq-dev postgresql-client-15 \
+    && docker-php-ext-install pdo pdo_pgsql
+
+# install and enable redis extension
+RUN pecl install redis-6.0.1 \
+    && docker-php-ext-enable redis
+
+# install and enable imagick extension
+RUN apt install -y libmagickwand-dev \
+    && pecl install imagick \
+    && docker-php-ext-enable imagick
+
+# install and enable zip extension
+RUN apt install -y libzip-dev \
+    && docker-php-ext-install zip
+
+# config and install php process controll extension
+RUN docker-php-ext-configure pcntl --enable-pcntl \
+    && docker-php-ext-install pcntl
+
+# install composer
+RUN curl -o- https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+
+# php config
+WORKDIR "${PHP_INI_DIR}"
+
+ADD ./conf.d/php.ini ./
+
+# php-fpm config
+WORKDIR "/usr/local/etc/php-fpm.d"
+
+RUN rm -rf ./*
+ADD ./conf.d/fpm/www.conf ./conf.d/fpm/zz-docker.conf ./
+
+# create missing folders
+ARG MEDIA_STORE="/data"
+
+# set data folder for objects and thumb
+RUN mkdir -pm 0770 "${MEDIA_STORE}" \
+    # update ownership
+    && chown -R www-data:www-data "/srv" "${MEDIA_STORE}" 
+
+# switch to workdir
+WORKDIR "${WORKPATH}"
+
+# ----------------------------------------
+ARG APP_KEY="--"
+ARG DB_DATABASE="lab_core_db"
+ARG DB_USERNAME="root"
+ARG DB_PASSWORD="passwd"
+
+ENV APP_ENV="staging"
+ENV APP_KEY="${APP_KEY}"
+ENV DB_DATABASE="${DB_DATABASE}"
+ENV DB_USERNAME="${DB_USERNAME}"
+ENV DB_PASSWORD="${DB_PASSWORD}"
