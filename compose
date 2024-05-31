@@ -9,15 +9,16 @@ then
     exit 1;
 fi
 
-prefix=".staging"
         
 # check if building for production
-echo "${1:-nop}" | grep -wi '--prod' &> /dev/null
+echo "${1:-nop}" | grep -wi '\-\-staging' &> /dev/null
 
 if [[ 0 -eq $? ]] 
 then
     shift 1
-    prefix=""
+    prefix=".staging"
+else
+    echo "runing productino"
 fi
 
 cmd="$(echo ${1:-nop} | awk '{print tolower($0)}')"
